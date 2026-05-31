@@ -15,4 +15,4 @@ jobs:
 
     
     - name: Construir imagem Docker
-      run: docker build -t minha-imagem . 
+      run: docker build -t minha-imagem ./frontend
