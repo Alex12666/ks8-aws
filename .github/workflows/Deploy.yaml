@@ -10,50 +10,84 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Baixa o código do seu repositório frontend para o GitHub Actions
+    # 1. Baixa o código do teu repositório para a máquina temporária do GitHub Actions
     - name: Checkout do código
       uses: actions/checkout@v4
 
-    # 2. Conecta na AWS usando as suas duas credenciais (Keys) cadastradas
+    # 2. Configura e autentica as credenciais da AWS usando os teus Secrets do GitHub
     - name: Configurar Credenciais AWS
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2 # A região de Ohio que usamos no Terraform
+        aws-region: us-east-2 # Região de Ohio que está no teu Terraform
 
-    # 3. Faz o login no registro de containers da AWS (ECR)
+    # 3. Faz o login automático no teu registro de imagens da AWS (ECR)
     - name: Login no Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    # 4. Constrói a imagem Docker a partir da sua pasta ./frontend e manda pro ECR
+    # 4. Faz o build do Dockerfile da tua app e envia a imagem gerada para o ECR
     - name: Construir imagem Docker e subir para o ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: imagem_ks # Exatamente o nome que está no seu ecr.tf
+        ECR_REPOSITORY: imagem_ks # Exatamente o nome que definiste no teu ecr.tf
         IMAGE_TAG: latest
       run: |
-        # Build da imagem apontando para a pasta do seu frontend
+        # Constrói a imagem apontando para a pasta onde está o teu código (ex: ./frontend)
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
         
-        # Sobe a imagem direto para o seu repositório ECR na AWS
+        # Envia a imagem para o teu repositório privado no ECR AWS
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-    # 5. Conecta na sua EC2 via SSH usando o IP Público e a Chave PEM para atualizar o K8s
+    # 5. Conecta na tua instância EC2 via SSH para atualizar o Kubernetes (EKS)
     - name: Executar comandos no Kubernetes via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
-        host: ${{ secrets.AWS_INSTANCE_PUBLIC_IP }} # O IP Público da sua EC2 nova
-        username: ubuntu                            # Usuário padrão da máquina Ubuntu
-        key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}       # O conteúdo todo do seu arquivo .pem
+        host: ${{ secrets.AWS_INSTANCE_PUBLIC_IP }}   # O IP público da tua EC2 nova
+        username: ubuntu                              # Usuário padrão do Ubuntu na AWS
+        key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}       # O conteúdo completo do teu arquivo .pem
         port: 22
         script: |
-          # 5.1 Atualiza o arquivo de contexto do kubectl para a máquina enxergar o EKS
+          # 5.1 Se a máquina não tiver o AWS CLI instalado, instala automaticamente agora
+          if ! command -v aws &> /dev/null; then
+            echo "AWS CLI não encontrado. Instalando..."
+            sudo apt-get update && sudo apt-get install -y unzip curl
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+            rm -rf aws awscliv2.zip
+            echo "AWS CLI instalado com sucesso!"
+          fi
+
+          # 5.2 Configura as chaves de acesso dentro da EC2 para ela poder falar com o EKS
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "region = us-east-2" >> ~/.aws/config
+
+          # 5.3 Se a máquina não tiver o kubectl instalado, instala automaticamente agora
+          if ! command -v kubectl &> /dev/null; then
+            echo "kubectl não encontrado. Instalando..."
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+            rm kubectl
+            echo "kubectl instalado com sucesso!"
+          fi
+
+          # 5.4 Atualiza o arquivo de contexto para que a EC2 consiga enxergar o teu EKS
           aws eks update-kubeconfig --region us-east-2 --name meu-cluster-eks
-          
-          # 5.2 Comando do Kubernetes para aplicar os seus manifestos (se houver um arquivo deployment.yaml)
+
+          # 5.5 Validação final: Lista as máquinas do teu cluster no terminal do GitHub Actions
+          echo "Testando a comunicação com o Cluster Kubernetes..."
+          kubectl get nodes
+
+          # =========================================================================================
+          # DICA PARA O FUTURO: Quando tiveres os teus arquivos manifestos do K8s (.yaml), 
+          # tira o '#' das linhas abaixo para rodar o deploy automático da tua aplicação:
+          #
           # kubectl apply -f ./k8s/deployment.yaml
-          
-          # 5.3 Força o Kubernetes a atualizar o container do Pod usando a imagem nova que acabou de subir no ECR
           # kubectl set image deployment/meu-frontend-deployment frontend-container=${{ steps.login-ecr.outputs.registry }}/imagem_ks:latest
+          # =========================================================================================
