@@ -9,6 +9,8 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
 
+  authentication_mode = "API_AND_CONFIG_MAP"
+
   create_auto_mode_iam_resources = true
 
   compute_config = {
