@@ -10,9 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # 1. Baixa o código do seu repositório frontend para o GitHub Actions
     - name: Checkout do código
       uses: actions/checkout@v4
 
-    
-    - name: Construir imagem Docker
-      run: docker build -t minha-imagem ./frontend
+    # 2. Conecta na AWS usando as suas duas credenciais (Keys) cadastradas
+    - name: Configurar Credenciais AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2 # A região de Ohio que usamos no Terraform
+
+    # 3. Faz o login no registro de containers da AWS (ECR)
+    - name: Login no Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # 4. Constrói a imagem Docker a partir da sua pasta ./frontend e manda pro ECR
+    - name: Construir imagem Docker e subir para o ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: imagem_ks # Exatamente o nome que está no seu ecr.tf
+        IMAGE_TAG: latest
+      run: |
+        # Build da imagem apontando para a pasta do seu frontend
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
+        
+        # Sobe a imagem direto para o seu repositório ECR na AWS
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # 5. Conecta na sua EC2 via SSH usando o IP Público e a Chave PEM para atualizar o K8s
+    - name: Executar comandos no Kubernetes via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.AWS_INSTANCE_PUBLIC_IP }} # O IP Público da sua EC2 nova
+        username: ubuntu                            # Usuário padrão da máquina Ubuntu
+        key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}       # O conteúdo todo do seu arquivo .pem
+        port: 22
+        script: |
+          # 5.1 Atualiza o arquivo de contexto do kubectl para a máquina enxergar o EKS
+          aws eks update-kubeconfig --region us-east-2 --name meu-cluster-eks
+          
+          # 5.2 Comando do Kubernetes para aplicar os seus manifestos (se houver um arquivo deployment.yaml)
+          # kubectl apply -f ./k8s/deployment.yaml
+          
+          # 5.3 Força o Kubernetes a atualizar o container do Pod usando a imagem nova que acabou de subir no ECR
+          # kubectl set image deployment/meu-frontend-deployment frontend-container=${{ steps.login-ecr.outputs.registry }}/imagem_ks:latest

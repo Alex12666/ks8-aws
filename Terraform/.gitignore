@@ -1,0 +1,36 @@
+# ==========================================
+# TERRAFORM (Bloquear estados e provedores)
+# ==========================================
+# Bloqueia a pasta de downloads de plugins e módulos do Terraform
+.terraform/
+
+# Bloqueia os arquivos de estado local (onde ficam guardados os dados da infraestrutura)
+*.tfstate
+*.tfstate.*
+
+# Bloqueia arquivos de variáveis automáticas que podem conter senhas/chaves confidenciais
+*.tfvars
+*.tfvars.json
+
+# Bloqueia arquivos de configuração de Workspace locais
+.terraform.lock.hcl
+
+# Bloqueia arquivos de log de crash do Terraform
+crash.log
+crash.*.log
+
+# ==========================================
+# CHAVES E SEGURANÇA (Crucial para o teu .pem)
+# ==========================================
+# Bloqueia qualquer chave privada (.pem) para nunca subir para o GitHub
+*.pem
+*.key
+*.id_rsa
+
+#
+*.log
+.DS_Store
+Thumbs.db
+
+# Se usares o VS Code para programar, bloqueia a pasta de configurações locais
+.vscode/
