@@ -1,10 +1,10 @@
-# AWS EKS Cluster com Terraform & EKS Auto Mode 🚀
+# AWS EKS Cluster com Terraform & EKS Auto Mode 
 
 Este projeto demonstra a criação e orquestração de uma infraestrutura de contentores na AWS utilizando **Terraform** para o aprovisionamento de infraestrutura como código (IaC) e o **Amazon EKS (Elastic Kubernetes Service) Auto Mode** para a gestão automática de nós e rede.
 
 O objetivo principal foi realizar o deploy automatizado de uma aplicação frontend (Docker) integrada com o AWS ECR (Elastic Container Registry) e exposta para a internet através de um AWS Load Balancer.
 
-## 🛠️ Tecnologias Utilizadas
+##  Tecnologias Utilizadas
 
 * **Terraform**: Criação de VPC, Subnets Públicas, Internet Gateway e Tabelas de Rotas.
 * **AWS EKS (Auto Mode)**: Orquestração do cluster Kubernetes com provisionamento automático de instâncias de computação.
@@ -12,7 +12,7 @@ O objetivo principal foi realizar o deploy automatizado de uma aplicação front
 * **Kubectl**: Gestão, criação de deployments e serviços dentro do cluster.
 * **Docker**: Criação e empacotamento da imagem do frontend.
 
-## 📐 Arquitetura da Infraestrutura
+##  Arquitetura da Infraestrutura
 
 A rede foi desenhada para garantir alta disponibilidade e comunicação direta com os serviços da AWS:
 
@@ -20,7 +20,7 @@ A rede foi desenhada para garantir alta disponibilidade e comunicação direta c
 * **2 Subnets Públicas** distribuídas em zonas de disponibilidade diferentes (`us-east-2a` e `us-east-2b`) com atribuição de IP público automático.
 * **Internet Gateway (IGW)** e Tabelas de Rotas configuradas para permitir tráfego público (`0.0.0.0/0`).
 
-## 🧠 Desafios Enfrentados e Aprendizados (Troubleshooting)
+##  Desafios Enfrentados e Aprendizados (Troubleshooting)
 
 Durante a execução do projeto, foram enfrentados desafios reais de engenharia de plataformas e problemas de integração clássicos de ambientes AWS/Kubernetes. Abaixo estão documentados os erros e as soluções encontradas:
 
@@ -39,7 +39,7 @@ Durante a execução do projeto, foram enfrentados desafios reais de engenharia 
 * **A Causa:** O acesso ao cluster estava a ser realizado utilizando as credenciais da conta **Root** da AWS. Por boas práticas e diretivas rígidas de segurança de IAM, a AWS bloqueia ações diretas do usuário Root no RBAC interno da API do Kubernetes sem configuração prévia.
 * **A Solução:** Ignorar a deleção manual via API do Kubernetes e delegar o processo de destruição diretamente ao **Terraform CLI**, que possui o mapeamento de estado (`state`) e consegue forçar a limpeza dos recursos principais a partir da infraestrutura da AWS.
 
-## 🚀 Como Executar o Projeto
+##  Como Executar o Projeto
 
 ### 1. Provisionar a Infraestrutura com Terraform
 Dentro do diretório do projeto, inicialize e aplique o código:
